@@ -61,3 +61,99 @@ By shifting the complexity from "runtime branching" to "pre-runtime sorting," we
 This architecture is designed to be "drop-in" compatible with inference engines like vLLM. I am releasing this architecture into the public domain to encourage adoption and further research.
 
 ---
+
+## Quick Start
+
+### Installation
+
+```bash
+pip install -e .
+# Or with dev dependencies:
+pip install -e ".[dev]"
+```
+
+### Basic Usage
+
+```python
+from utio import surrogate_importance, bucket_tokens, run_buckets
+import torch
+
+# 1. Compute importance scores
+tis = surrogate_importance(logits, attn_heat, embeddings)
+
+# 2. Bucket tokens by depth
+buckets, order, inv = bucket_tokens(tis, bucket_cutoffs=(6, 16, 32), min_bucket=8)
+
+# 3. Execute bucketed forward passes
+outputs = run_buckets(model, inputs, buckets, order, inv)
+```
+
+See `example.py` for a complete working example.
+
+### Running Tests
+
+```bash
+pytest tests/
+```
+
+### Running Benchmarks
+
+```bash
+python -m utio.benchmark
+```
+
+## Project Structure
+
+- `utio/` - Core implementation
+  - `signal.py` - Surrogate importance scoring
+  - `routing.py` - Token bucketing logic
+  - `runner.py` - Bucketed execution wrapper
+  - `benchmark.py` - Performance benchmarks
+- `tests/` - Unit tests
+- `example.py` - Simple demonstration
+
+## Integration
+
+### vLLM Integration
+
+UTIO can be integrated into vLLM with a simple wrapper:
+
+```python
+from vllm import LLM
+from utio.vllm_integration import patch_vllm_model_executor
+
+llm = LLM(model="meta-llama/Llama-2-7b-hf")
+patch_vllm_model_executor(llm.llm_engine.model_executor, use_utio=True)
+```
+
+See `utio/vllm_integration.py` for details.
+
+### Benchmarking
+
+Run the comprehensive benchmark suite:
+
+```bash
+python benchmarks/benchmark_suite.py \
+    --model llama-7b \
+    --batch-sizes 32 64 128 \
+    --prompt-lengths 512 2048 \
+    --output benchmarks/results.json
+```
+
+Generate reports:
+
+```bash
+python benchmarks/compare_results.py \
+    --results benchmarks/results.json \
+    --output-dir benchmarks/reports
+```
+
+## Next Steps
+
+- [x] vLLM integration plugin
+- [x] Real-world benchmark suite
+- [ ] Sparse attention integration
+- [ ] KV cache throttling
+- [ ] Production-ready vLLM PR
+
+---
