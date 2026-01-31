@@ -1,0 +1,52 @@
+{
+  "results": [
+    {
+      "config": {
+        "batch_size": 16,
+        "prompt_length": 128,
+        "output_length": 32,
+        "bucket_cutoffs": [
+          6,
+          16,
+          32
+        ],
+        "min_bucket": 8
+      },
+      "baseline_latency_ms": 250474.4055200019,
+      "utio_latency_ms": 250474.4055200019,
+      "speedup": 1.0,
+      "latency_reduction_pct": 0.0,
+      "tis_overhead_ms": 2.2905419999733567,
+      "bucketing_overhead_ms": 0.6543950000195764,
+      "quality_metric": null,
+      "quality_delta": null
+    },
+    {
+      "config": {
+        "batch_size": 32,
+        "prompt_length": 128,
+        "output_length": 32,
+        "bucket_cutoffs": [
+          6,
+          16,
+          32
+        ],
+        "min_bucket": 8
+      },
+      "baseline_latency_ms": 385746.1058999994,
+      "utio_latency_ms": 385746.1058999994,
+      "speedup": 1.0,
+      "latency_reduction_pct": 0.0,
+      "tis_overhead_ms": 3.8953470000706147,
+      "bucketing_overhead_ms": 0.1932900000247173,
+      "quality_metric": null,
+      "quality_delta": null
+    }
+  ],
+  "summary": {
+    "avg_speedup": 1.0,
+    "avg_latency_reduction": 0.0,
+    "avg_tis_overhead_ms": 3.0929445000219857,
+    "avg_bucketing_overhead_ms": 0.42384250002214685
+  }
+}

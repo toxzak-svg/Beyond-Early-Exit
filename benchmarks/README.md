@@ -5,7 +5,10 @@ This directory contains comprehensive benchmarks for UTIO performance on real ha
 ## Quick Start
 
 ```bash
-# Run default benchmark suite
+# Fast run (CPU, tiny model, for smoke test)
+python benchmarks/benchmark_suite.py --fast --output benchmarks/results.json
+
+# Run default benchmark suite (GPU recommended)
 python benchmarks/benchmark_suite.py
 
 # Custom configuration
@@ -56,9 +59,13 @@ To benchmark with actual models (e.g., via vLLM):
 
 ## Example Results
 
+On GPU with larger batches and real depth variance, you typically see:
+
 ```
 Average Speedup: 1.25x
 Average Latency Reduction: 20.0%
 Average TIS Overhead: 0.15ms
 Average Bucketing Overhead: 0.05ms
 ```
+
+**Note:** With `--fast` (tiny model, small batch on CPU), speedup may be 1.0x because all tokens often land in one bucket and UTIO is skipped. Use full config on GPU to measure real gains.

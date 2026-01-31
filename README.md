@@ -102,6 +102,10 @@ pytest tests/
 python -m utio.benchmark
 ```
 
+### Running on a Cloud GPU
+
+See **[docs/CLOUD_GPU.md](docs/CLOUD_GPU.md)** for setup on RunPod, Lambda Labs, GCP, AWS, and Vast.ai.
+
 ## Project Structure
 
 - `utio/` - Core implementation
@@ -154,6 +158,6 @@ python benchmarks/compare_results.py \
 - [x] Real-world benchmark suite
 - [ ] Sparse attention integration
 - [ ] KV cache throttling
-- [ ] Production-ready vLLM PR
+- [ ] Production-ready vLLM PR (see `vllm_pr/` for PR description and integration notes)
 
 ---

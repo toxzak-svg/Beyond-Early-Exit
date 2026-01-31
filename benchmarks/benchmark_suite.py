@@ -5,7 +5,7 @@ import json
 import time
 from dataclasses import dataclass, asdict
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Union
 
 import torch
 from torch import Tensor, nn
@@ -163,15 +163,16 @@ def run_single_benchmark(
     output_length: int,
     bucket_cutoffs: Tuple[int, ...],
     min_bucket: int,
-    device: str,
+    device: Union[str, torch.device],
     num_warmup: int,
     num_runs: int,
 ) -> BenchmarkResult:
     """Run a single benchmark configuration."""
     model.eval()
 
-    # Generate inputs
-    input_ids = torch.randint(0, model.vocab_size, (batch_size, prompt_length), device=device)
+    # Generate inputs (device may be str or torch.device)
+    device_obj = device if isinstance(device, torch.device) else torch.device(device)
+    input_ids = torch.randint(0, model.vocab_size, (batch_size, prompt_length), device=device_obj)
     target_length = prompt_length + output_length
 
     # Simulate features needed for TIS
@@ -182,11 +183,11 @@ def run_single_benchmark(
         logits = logits_full[:, -1, :]  # Last token logits
 
         # Simulate attention heat (would come from cached attention in real vLLM)
-        attn_heat = torch.randn(batch_size, 32, device=device)
+        attn_heat = torch.randn(batch_size, 32, device=device_obj)
 
     # Baseline: Full depth forward
     with torch.no_grad():
-        if device == "cuda":
+        if device_obj.type == "cuda":
             torch.cuda.synchronize()
 
         # Warmup
@@ -197,7 +198,7 @@ def run_single_benchmark(
         start = time.perf_counter()
         for _ in range(num_runs):
             _ = model(input_ids, max_depth=model.num_layers)
-        if device == "cuda":
+        if device_obj.type == "cuda":
             torch.cuda.synchronize()
         baseline_time = (time.perf_counter() - start) / num_runs
 
@@ -216,18 +217,19 @@ def run_single_benchmark(
                 _ = run_buckets(model, input_ids, buckets, order, inv, depth_kw="max_depth")
 
             # Measure
-            if device == "cuda":
+            if device_obj.type == "cuda":
                 torch.cuda.synchronize()
             start = time.perf_counter()
             for _ in range(num_runs):
                 _ = run_buckets(model, input_ids, buckets, order, inv, depth_kw="max_depth")
-            if device == "cuda":
+            if device_obj.type == "cuda":
                 torch.cuda.synchronize()
             utio_time = (time.perf_counter() - start) / num_runs
 
     # Measure overheads
-    tis_overhead = measure_tis_overhead(batch_size, model.vocab_size, model.dim, 32, device)
-    bucketing_overhead = measure_bucketing_overhead(batch_size, device)
+    device_str = device_obj.type if hasattr(device_obj, "type") else str(device_obj)
+    tis_overhead = measure_tis_overhead(batch_size, model.vocab_size, model.dim, 32, device_str)
+    bucketing_overhead = measure_bucketing_overhead(batch_size, device_str)
 
     speedup = baseline_time / utio_time if utio_time > 0 else 1.0
     latency_reduction = (1.0 - utio_time / baseline_time) * 100 if baseline_time > 0 else 0.0
@@ -255,8 +257,10 @@ def run_benchmark_suite(config: BenchmarkConfig) -> List[BenchmarkResult]:
     print(f"Running benchmarks on: {device}")
 
     # Model configurations (simulating different model sizes)
+    # Use "llama-7b-tiny" for fast CPU/smoke tests
     model_configs = {
         "llama-7b": {"num_layers": 32, "dim": 4096, "vocab_size": 32000},
+        "llama-7b-tiny": {"num_layers": 8, "dim": 256, "vocab_size": 32000},
         "llama-13b": {"num_layers": 40, "dim": 5120, "vocab_size": 32000},
         "llama-70b": {"num_layers": 80, "dim": 8192, "vocab_size": 32000},
         "mistral-7b": {"num_layers": 32, "dim": 4096, "vocab_size": 32000},
@@ -286,7 +290,7 @@ def run_benchmark_suite(config: BenchmarkConfig) -> List[BenchmarkResult]:
                     output_len,
                     config.bucket_cutoffs,
                     config.min_bucket,
-                    config.device,
+                    device,
                     config.num_warmup,
                     config.num_runs,
                 )
@@ -330,8 +334,18 @@ def main():
     parser.add_argument("--device", type=str, default="cuda", help="Device to use")
     parser.add_argument("--num-runs", type=int, default=50, help="Number of runs per config")
     parser.add_argument("--num-warmup", type=int, default=10, help="Number of warmup runs")
+    parser.add_argument("--fast", action="store_true", help="Fast run: tiny model, small batches, few runs (for CPU/smoke)")
 
     args = parser.parse_args()
+
+    if args.fast:
+        args.model = "llama-7b-tiny"
+        args.batch_sizes = [8, 16]
+        args.prompt_lengths = [64]
+        args.output_lengths = [16]
+        args.num_runs = 3
+        args.num_warmup = 1
+        args.device = "cpu"
 
     config = BenchmarkConfig(
         model_name=args.model,
